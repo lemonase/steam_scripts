@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 A quick python script to get a game's current player count
 """
@@ -6,6 +7,7 @@ import asyncio
 import os
 import sys
 import json
+import re
 import requests
 from tabulate import tabulate
 
@@ -62,11 +64,14 @@ def search_app_list(search_string):
         found_app_names = []
         found_app_players = []
 
+        # create regular expression from search string
+        pattern = re.compile(search_string.lower())
+
         for game_dict in app_list:
             app_id = game_dict["appid"]
             app_name = game_dict["name"]
 
-            if search_string.lower() in app_name.lower():
+            if pattern.search(app_name.lower()):
                 found_app_ids.append(app_id)
                 found_app_names.append(app_name)
 
