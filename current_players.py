@@ -65,7 +65,7 @@ def search_app_list(search_string):
         found_app_players = []
 
         # create regular expression from search string
-        pattern = re.compile(search_string.lower())
+        pattern = re.compile(re.escape(search_string.lower()))
 
         for game_dict in app_list:
             app_id = game_dict["appid"]
