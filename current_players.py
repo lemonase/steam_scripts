@@ -2,14 +2,15 @@
 """
 A quick python script to get a game's current player count
 """
-# from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 import asyncio
-import os
-import sys
 import json
+import os
 import re
-import requests
+import sys
+import tempfile
+
 from tabulate import tabulate
+import requests
 
 if sys.version_info[0] < 3:
     raise Exception("Must use Python 3")
@@ -20,13 +21,12 @@ APP_LIST_URL = BASE_URL + "ISteamApps/GetAppList/v2/"
 PLAYER_COUNT_URL = BASE_URL + "ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
 
 # LOCAL FILES
-APP_LIST_FILE = "data/app_list.json"
+TEMP_DATA_DIR = os.path.join(tempfile.gettempdir(), "steam_scripts", "data")
+APP_LIST_FILE = os.path.join(TEMP_DATA_DIR, "app_list.json")
 
 
 def get_app_list():
-    """
-    Save app catalog as app_list.json
-    """
+    """ Save app catalog as app_list.json """
     res = requests.get(APP_LIST_URL)
 
     with open(APP_LIST_FILE, "w", encoding="utf-8") as out_file:
@@ -34,9 +34,7 @@ def get_app_list():
 
 
 async def get_player_counts(app_ids, app_players):
-    """
-    Asynchronously request player count from a list of app_ids
-    """
+    """ Asynchronously request player count from a list of app_ids """
     loop = asyncio.get_event_loop()
 
     futures = [
@@ -52,9 +50,7 @@ async def get_player_counts(app_ids, app_players):
 
 
 def search_app_list(search_string):
-    """
-    Search app_list for the search_string and print matches
-    """
+    """ Search app_list for the search_string and print matches """
     with open(APP_LIST_FILE, "r", encoding="utf-8") as list_file:
         json_dict = json.loads(list_file.read())
         app_list = json_dict["applist"]["apps"]
@@ -88,9 +84,7 @@ def search_app_list(search_string):
 
 
 def print_player_table(found_app_ids, found_app_names, found_app_players):
-    """
-    Print table of player stats
-    """
+    """ Print table of player stats """
     # zip lists for sorting
     zipped = zip(found_app_players, found_app_ids, found_app_names)
     zipped = sorted(zipped)
@@ -112,23 +106,20 @@ def print_player_table(found_app_ids, found_app_names, found_app_players):
 
 
 def print_usage():
-    """
-    Output usage
-    """
+    """ Output usage """
     print("Usage:\npython3", sys.argv[0], "<name of game>\n")
 
 
 def main():
-    """
-    Main function
-    """
+    """ Main function """
     try:
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
             print_usage()
+        elif sys.argv[1] == "-c" or sys.argv[1] == "--clear-tempfile":
+            os.removedirs(TEMP_DATA_DIR)
         else:
             # make data dir
-            if not os.path.exists("data"):
-                os.mkdir("data")
+            os.makedirs(TEMP_DATA_DIR, exist_ok=True)
 
             # download app list
             if not os.path.exists(APP_LIST_FILE):
