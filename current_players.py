@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 from tabulate import tabulate
 import requests
@@ -28,6 +29,11 @@ APP_LIST_FILE = os.path.join(TEMP_DATA_DIR, "app_list.json")
 def get_app_list():
     """ Save app catalog as app_list.json """
     res = requests.get(APP_LIST_URL)
+
+    res.raise_for_status()
+    while res.json() is None:
+        time.sleep(1)
+        res = requests.get(APP_LIST_URL)
 
     with open(APP_LIST_FILE, "w", encoding="utf-8") as out_file:
         out_file.write(res.text)
