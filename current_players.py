@@ -42,12 +42,13 @@ def get_app_list():
 async def get_player_counts(app_ids, app_players):
     """ Asynchronously request player count from a list of app_ids """
     loop = asyncio.get_event_loop()
+    futures = []
 
-    futures = [
-        loop.run_in_executor(None, requests.get,
-                             PLAYER_COUNT_URL + "?appid=" + str(app_id))
-        for app_id in app_ids
-    ]
+    for app_id in app_ids:
+        futures.append(
+            loop.run_in_executor(None, requests.get,
+                                 PLAYER_COUNT_URL + "?appid=" + str(app_id)))
+
     for response in await asyncio.gather(*futures):
         try:
             app_players.append(response.json()["response"]["player_count"])
