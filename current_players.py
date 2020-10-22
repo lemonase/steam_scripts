@@ -10,7 +10,6 @@ import sys
 import tempfile
 import time
 
-from tabulate import tabulate
 import requests
 
 if sys.version_info[0] < 3:
@@ -24,6 +23,8 @@ PLAYER_COUNT_URL = BASE_URL + "ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
 # LOCAL FILES
 TEMP_DATA_DIR = os.path.join(tempfile.gettempdir(), "steam_scripts", "data")
 APP_LIST_FILE = os.path.join(TEMP_DATA_DIR, "app_list.json")
+
+PRINT_LIST = False
 
 
 def get_app_list():
@@ -85,12 +86,19 @@ def search_app_list(search_string):
         loop.run_until_complete(
             get_player_counts(found_app_ids, found_app_players))
 
-    # print lists with tabulate
+    # print table
     print_player_table(found_app_ids, found_app_names, found_app_players)
 
 
 def print_player_table(found_app_ids, found_app_names, found_app_players):
     """ Print table of player stats """
+    if not found_app_ids:
+        print("No App ID's found with search term", file=sys.stderr)
+        sys.exit()
+    elif not found_app_names:
+        print("No App Names found with search term", file=sys.stderr)
+        sys.exit()
+
     # zip lists for sorting
     zipped = zip(found_app_players, found_app_ids, found_app_names)
     zipped = sorted(zipped)
@@ -100,42 +108,74 @@ def print_player_table(found_app_ids, found_app_names, found_app_players):
     found_app_names = [n for (p, i, n) in zipped]
     found_app_players = [p for (p, i, n) in zipped]
 
-    # print out table
-    print(
-        tabulate(
-            {
-                "App Id": found_app_ids,
-                "App Name": found_app_names,
-                "Players": found_app_players
-            },
-            tablefmt="grid"))
+    w = int(os.get_terminal_size().columns)
+
+    if (PRINT_LIST == True):
+        # print in list format
+        print("-" * int(w / 3))
+        for id, name, players in zip(found_app_ids, found_app_names, found_app_players):
+            print("{:10}{id}\n{:10}{name}\n{:10}{players}".format("App ID:", "Name:", "Players:",
+                                                                  id=id, name=name, players=players))
+            print("-" * int(w / 3))
+    else:
+        # print in table format
+        longest_name_width = len(max(found_app_names, key=len))
+        # make sure the longest name is not more than 1/3 of the screen width
+        if longest_name_width > int(w / 3):
+            longest_name_width = int(w / 3)
+
+        # header formatting
+        header = "| {id:<10} | {name:<{mid_space}} | {players:<10} |".format(
+            id="ID", name="App Name", players="Players", mid_space=longest_name_width)
+
+        # print out table header
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
+
+        # print rows
+        for id, name, players in zip(found_app_ids, found_app_names, found_app_players):
+            row = "| {id:<10} | {name:<{mid_space}} | {players:<10} |".format(
+                id=id, name=name[:longest_name_width], players=players, mid_space=longest_name_width)
+            print(row)
+
+        # print out table header again (for long output)
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
 
 
 def print_usage():
     """ Output usage """
-    print("Usage:\npython3", sys.argv[0], "<name of game>\n")
+    print("Usage:\npython3", sys.argv[0], "<name of game>\n", file=sys.stderr)
+    print("Options:")
+    print("-h, --help\t\t\t print this help message")
+    print("-c, --clear-tempfile\t\t clear the temp json file")
+    print("-l, --list\t\t\t print output in a list instead of a table\n \t\t\t\t (ideal for long game titles)")
 
 
 def main():
     """ Main function """
-    try:
-        if sys.argv[1] == "-h" or sys.argv[1] == "--help":
-            print_usage()
-        elif sys.argv[1] == "-c" or sys.argv[1] == "--clear-tempfile":
-            os.removedirs(TEMP_DATA_DIR)
-        else:
-            # make data dir
-            os.makedirs(TEMP_DATA_DIR, exist_ok=True)
+    # make data dir
+    os.makedirs(TEMP_DATA_DIR, exist_ok=True)
+    # download app list
+    if not os.path.exists(APP_LIST_FILE):
+        get_app_list()
 
-            # download app list
-            if not os.path.exists(APP_LIST_FILE):
-                get_app_list()
-
-            # search the app list
-            for arg in sys.argv:
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg == "-h" or arg == "--help":
+                print_usage()
+                sys.exit()
+            elif arg == "-c" or arg == "--clear-tempfile":
+                os.removedirs(TEMP_DATA_DIR)
+                sys.exit()
+            elif arg == "-l" or arg == "--list":
+                global PRINT_LIST
+                PRINT_LIST = True
+            else:
                 search_app_list(arg)
-
-    except IndexError:
+    else:
         print_usage()
 
 
