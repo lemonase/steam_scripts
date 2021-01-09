@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 
+import click
 import requests
 
 if sys.version_info[0] < 3:
@@ -46,9 +47,8 @@ async def get_player_counts(app_ids, app_players):
     futures = []
 
     for app_id in app_ids:
-        futures.append(
-            loop.run_in_executor(None, requests.get,
-                                 PLAYER_COUNT_URL + "?appid=" + str(app_id)))
+        futures.append(loop.run_in_executor(None, requests.get,
+                                            PLAYER_COUNT_URL + "?appid=" + str(app_id)))
 
     for response in await asyncio.gather(*futures):
         try:
@@ -57,8 +57,11 @@ async def get_player_counts(app_ids, app_players):
             app_players.append(0)
 
 
-def search_app_list(search_string):
-    """ Search app_list for the search_string and print matches """
+def get_apps_info(search_string):
+    """
+    Search app_list for the search_string and return relevant data in a tuple
+    with 3 members
+     """
     with open(APP_LIST_FILE, "r", encoding="utf-8") as list_file:
         json_dict = json.loads(list_file.read())
         app_list = json_dict["applist"]["apps"]
@@ -79,19 +82,21 @@ def search_app_list(search_string):
                 found_app_ids.append(app_id)
                 found_app_names.append(app_name)
 
+        print("Number of Apps Matching Search:", len(found_app_ids))
+
     # request players asynchronously from steam api
     if sys.version_info[1] >= 7:
-        asyncio.run(get_player_counts(found_app_ids, found_app_players))
+        asyncio.run(get_player_counts(
+            found_app_ids, found_app_players))
     else:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(
             get_player_counts(found_app_ids, found_app_players))
 
-    # print table
-    print_player_table(found_app_ids, found_app_names, found_app_players)
+    return (found_app_ids, found_app_names, found_app_players)
 
 
-def print_player_table(found_app_ids, found_app_names, found_app_players):
+def print_player_table(found_app_ids, found_app_names, found_app_players, num_rows):
     """ Print table of player stats """
     if not found_app_ids:
         print("No App ID's found with search term", file=sys.stderr)
@@ -109,18 +114,31 @@ def print_player_table(found_app_ids, found_app_names, found_app_players):
     found_app_names = [n for (p, i, n) in zipped]
     found_app_players = [p for (p, i, n) in zipped]
 
+    display_app_ids = []
+    display_app_names = []
+    display_app_players = []
+
+    for n in range(num_rows):
+        display_app_ids.append(found_app_ids.pop())
+        display_app_names.append(found_app_names.pop())
+        display_app_players.append(found_app_players.pop())
+
+    print("Number of Apps Displayed:", num_rows, end="")
+    print(" (use -n or --num-rows to show more)")
+
     w = int(os.get_terminal_size().columns)
 
     if (PRINT_LIST == True):
         # print in list format
         print("-" * int(w / 3))
-        for id, name, players in zip(found_app_ids, found_app_names, found_app_players):
-            print("{:10}{id}\n{:10}{name}\n{:10}{players}".format("App ID:", "Name:", "Players:",
-                                                                  id=id, name=name, players=players))
+        for id, name, players in zip(display_app_ids, display_app_names, display_app_players):
+            print("{:10}{id}\n{:10}{name}\n{:10}{players}".format(
+                "App ID:", "Name:", "Players:",
+                id=id, name=name, players=players))
             print("-" * int(w / 3))
     else:
         # print in table format
-        longest_name_width = len(max(found_app_names, key=len))
+        longest_name_width = len(max(display_app_names, key=len))
         # make sure the longest name is not more than 1/3 of the screen width
         if longest_name_width > int(w / 3):
             longest_name_width = int(w / 3)
@@ -135,7 +153,7 @@ def print_player_table(found_app_ids, found_app_names, found_app_players):
         print("-" * len(header))
 
         # print rows
-        for id, name, players in zip(found_app_ids, found_app_names, found_app_players):
+        for id, name, players in zip(display_app_ids, display_app_names, display_app_players):
             row = "| {id:<10} | {name:<{mid_space}} | {players:<10} |".format(
                 id=id, name=name[:longest_name_width], players=players, mid_space=longest_name_width)
             print(row)
@@ -146,38 +164,28 @@ def print_player_table(found_app_ids, found_app_names, found_app_players):
         print("-" * len(header))
 
 
-def print_usage():
-    """ Output usage """
-    print("Usage:\npython3", sys.argv[0], "<name of game>\n", file=sys.stderr)
-    print("Options:")
-    print("-h, --help\t\t\t print this help message")
-    print("-c, --clear-tempfile\t\t clear the temp json file")
-    print("-l, --list\t\t\t print output in a list instead of a table\n \t\t\t\t (ideal for long game titles)")
+@click.command()
+@click.option('--clear-cache', "-c", is_flag=True, required=False, help="Clears the cached appid file")
+@click.option("--list-format", "-l", is_flag=True, required=False, help="Output a list instead of a table")
+@click.option("--num-rows", "-n", type=click.INT, default=10, required=False)
+@click.argument("query")
+def main(clear_cache, list_format, num_rows, query):
+    if clear_cache:
+        os.removedirs(TEMP_DATA_DIR)
 
+    if not os.path.exists(TEMP_DATA_DIR):
+        os.makedirs(TEMP_DATA_DIR, exist_ok=True)
 
-def main():
-    """ Main function """
-    # make data dir
-    os.makedirs(TEMP_DATA_DIR, exist_ok=True)
-    # download app list
     if not os.path.exists(APP_LIST_FILE):
         get_app_list()
 
-    if len(sys.argv) > 1:
-        for arg in sys.argv[1:]:
-            if arg == "-h" or arg == "--help":
-                print_usage()
-                sys.exit()
-            elif arg == "-c" or arg == "--clear-tempfile":
-                os.removedirs(TEMP_DATA_DIR)
-                sys.exit()
-            elif arg == "-l" or arg == "--list":
-                global PRINT_LIST
-                PRINT_LIST = True
-            else:
-                search_app_list(arg)
-    else:
-        print_usage()
+    if list_format:
+        global PRINT_LIST
+        PRINT_LIST = True
+
+    apps_info = get_apps_info(query)
+    print_player_table(apps_info[0], apps_info[1], apps_info[2], num_rows)
 
 
-main()
+if __name__ == "__main__":
+    main()
