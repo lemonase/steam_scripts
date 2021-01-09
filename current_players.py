@@ -57,7 +57,7 @@ async def get_player_counts(app_ids, app_players):
             app_players.append(0)
 
 
-def get_apps_info(search_string):
+def get_apps_info(search_string, fuzzy_match):
     """
     Search app_list for the search_string and return relevant data in a tuple
     with 3 members
@@ -71,16 +71,20 @@ def get_apps_info(search_string):
         found_app_names = []
         found_app_players = []
 
-        # create regular expression from search string
-        pattern = re.compile(re.escape(search_string.lower()))
-
         for game_dict in app_list:
             app_id = game_dict["appid"]
             app_name = game_dict["name"]
 
-            if pattern.search(app_name.lower()):
-                found_app_ids.append(app_id)
-                found_app_names.append(app_name)
+            if fuzzy_match:
+                from fuzzywuzzy import fuzz
+                if fuzz.partial_ratio(app_name.lower(), search_string.lower()) >= 85:
+                    found_app_ids.append(app_id)
+                    found_app_names.append(app_name)
+            else:
+                pattern = re.compile(re.escape(search_string.lower()))
+                if pattern.search(app_name.lower()):
+                    found_app_ids.append(app_id)
+                    found_app_names.append(app_name)
 
         print("Number of Apps Matching Search:", len(found_app_ids))
 
@@ -125,8 +129,7 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
         display_app_names.append(found_app_names.pop())
         display_app_players.append(found_app_players.pop())
 
-    print("Number of Apps Displayed:", num_rows, end="")
-    print(" (use -n or --num-rows to show more)")
+    print("Number of Apps Displayed:", num_rows)
 
     w = int(os.get_terminal_size().columns)
 
@@ -169,9 +172,10 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
 @click.command()
 @click.option('--clear-cache', "-c", is_flag=True, required=False, help="Clears the cached appid file")
 @click.option("--list-format", "-l", is_flag=True, required=False, help="Output a list instead of a table")
+@click.option("--fuzzy-match", "-f", is_flag=True, required=False, help="Use Levenshtein fuzzy matching on query")
 @click.option("--num-rows", "-n", type=click.INT, default=10, required=False)
 @click.argument("query")
-def main(clear_cache, list_format, num_rows, query):
+def main(clear_cache, list_format, num_rows, query, fuzzy_match):
     if clear_cache:
         os.removedirs(TEMP_DATA_DIR)
 
@@ -185,7 +189,7 @@ def main(clear_cache, list_format, num_rows, query):
         global PRINT_LIST
         PRINT_LIST = True
 
-    apps_info = get_apps_info(query)
+    apps_info = get_apps_info(query, fuzzy_match)
     print_player_table(apps_info[0], apps_info[1], apps_info[2], num_rows)
 
 
