@@ -118,7 +118,9 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
     display_app_names = []
     display_app_players = []
 
-    for n in range(num_rows):
+    for n in range(len(found_app_ids)):
+        if n >= num_rows:
+            break
         display_app_ids.append(found_app_ids.pop())
         display_app_names.append(found_app_names.pop())
         display_app_players.append(found_app_players.pop())
