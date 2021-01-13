@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-A quick python script to get a game's current player count
+A script to fetch the current player count in steam for a given game query
 """
 import asyncio
 import json
@@ -13,8 +13,10 @@ import time
 import click
 import requests
 
+
 if sys.version_info[0] < 3:
-    raise Exception("Must use Python 3")
+    raise Exception("Script requires Python 3.x")
+
 
 # API ENDPOINTS
 BASE_URL = "https://api.steampowered.com/"
@@ -31,8 +33,8 @@ PRINT_LIST = False
 def get_app_list():
     """ Save app catalog as app_list.json """
     res = requests.get(APP_LIST_URL)
-
     res.raise_for_status()
+
     while res.json() is None:
         time.sleep(1)
         res = requests.get(APP_LIST_URL)
@@ -159,7 +161,7 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
 
         # print rows
         for id, name, players in zip(display_app_ids, display_app_names, display_app_players):
-            row = "| {id:<10} | {name:<{mid_space}} | {players:<10} |".format(
+            row = "| {id:<10} | {name:<{mid_space}} | {players:<10,} |".format(
                 id=id, name=name[:longest_name_width], players=players, mid_space=longest_name_width)
             print(row)
 
