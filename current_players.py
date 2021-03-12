@@ -13,10 +13,8 @@ import time
 import click
 import requests
 
-
 if sys.version_info[0] < 3:
     raise Exception("Script requires Python 3.x")
-
 
 # API ENDPOINTS
 BASE_URL = "https://api.steampowered.com/"
@@ -49,8 +47,9 @@ async def get_player_counts(app_ids, app_players):
     futures = []
 
     for app_id in app_ids:
-        futures.append(loop.run_in_executor(None, requests.get,
-                                            PLAYER_COUNT_URL + "?appid=" + str(app_id)))
+        futures.append(
+            loop.run_in_executor(None, requests.get,
+                                 PLAYER_COUNT_URL + "?appid=" + str(app_id)))
 
     for response in await asyncio.gather(*futures):
         try:
@@ -63,7 +62,7 @@ def get_apps_info(search_string, fuzzy_match):
     """
     Search app_list for the search_string and return relevant data in a tuple
     with 3 members
-     """
+    """
     with open(APP_LIST_FILE, "r", encoding="utf-8") as list_file:
         json_dict = json.loads(list_file.read())
         app_list = json_dict["applist"]["apps"]
@@ -79,7 +78,9 @@ def get_apps_info(search_string, fuzzy_match):
 
             if fuzzy_match:
                 from fuzzywuzzy import fuzz
-                if fuzz.partial_ratio(app_name.lower(), search_string.lower()) >= 85:
+
+                if fuzz.partial_ratio(app_name.lower(),
+                                      search_string.lower()) >= 85:
                     found_app_ids.append(app_id)
                     found_app_names.append(app_name)
             else:
@@ -92,8 +93,7 @@ def get_apps_info(search_string, fuzzy_match):
 
     # request players asynchronously from steam api
     if sys.version_info[1] >= 7:
-        asyncio.run(get_player_counts(
-            found_app_ids, found_app_players))
+        asyncio.run(get_player_counts(found_app_ids, found_app_players))
     else:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(
@@ -102,7 +102,8 @@ def get_apps_info(search_string, fuzzy_match):
     return (found_app_ids, found_app_names, found_app_players)
 
 
-def print_player_table(found_app_ids, found_app_names, found_app_players, num_rows):
+def print_player_table(found_app_ids, found_app_names, found_app_players,
+                       num_rows):
     """ Print table of player stats """
     if not found_app_ids:
         print("No App ID's found with search term", file=sys.stderr)
@@ -135,13 +136,18 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
 
     w = int(os.get_terminal_size().columns)
 
-    if (PRINT_LIST == True):
+    if PRINT_LIST:
         # print in list format
         print("-" * int(w / 3))
-        for id, name, players in zip(display_app_ids, display_app_names, display_app_players):
+        for id, name, players in zip(display_app_ids, display_app_names,
+                                     display_app_players):
             print("{:10}{id}\n{:10}{name}\n{:10}{players}".format(
-                "App ID:", "Name:", "Players:",
-                id=id, name=name, players=players))
+                "App ID:",
+                "Name:",
+                "Players:",
+                id=id,
+                name=name,
+                players=players))
             print("-" * int(w / 3))
     else:
         # print in table format
@@ -152,7 +158,10 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
 
         # header formatting
         header = "| {id:<10} | {name:<{mid_space}} | {players:<10} |".format(
-            id="ID", name="App Name", players="Players", mid_space=longest_name_width)
+            id="ID",
+            name="App Name",
+            players="Players",
+            mid_space=longest_name_width)
 
         # print out table header
         print("-" * len(header))
@@ -160,9 +169,14 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
         print("-" * len(header))
 
         # print rows
-        for id, name, players in zip(display_app_ids, display_app_names, display_app_players):
+        for id, name, players in zip(display_app_ids, display_app_names,
+                                     display_app_players):
             row = "| {id:<10} | {name:<{mid_space}} | {players:<10,} |".format(
-                id=id, name=name[:longest_name_width], players=players, mid_space=longest_name_width)
+                id=id,
+                name=name[:longest_name_width],
+                players=players,
+                mid_space=longest_name_width,
+            )
             print(row)
 
         # print out table header again (for long output)
@@ -172,9 +186,27 @@ def print_player_table(found_app_ids, found_app_names, found_app_players, num_ro
 
 
 @click.command()
-@click.option('--clear-cache', "-c", is_flag=True, required=False, help="Clears the cached appid file")
-@click.option("--list-format", "-l", is_flag=True, required=False, help="Output a list instead of a table")
-@click.option("--fuzzy-match", "-f", is_flag=True, required=False, help="Use Levenshtein fuzzy matching on query")
+@click.option(
+    "--clear-cache",
+    "-c",
+    is_flag=True,
+    required=False,
+    help="Clears the cached appid file",
+)
+@click.option(
+    "--list-format",
+    "-l",
+    is_flag=True,
+    required=False,
+    help="Output a list instead of a table",
+)
+@click.option(
+    "--fuzzy-match",
+    "-f",
+    is_flag=True,
+    required=False,
+    help="Use Levenshtein fuzzy matching on query",
+)
 @click.option("--num-rows", "-n", type=click.INT, default=10, required=False)
 @click.argument("query")
 def main(clear_cache, list_format, num_rows, query, fuzzy_match):
